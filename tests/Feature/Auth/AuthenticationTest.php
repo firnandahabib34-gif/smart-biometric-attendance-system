@@ -58,6 +58,7 @@ class AuthenticationTest extends TestCase
         $response = $this->actingAs(User::factory()->create())->get(route('dashboard'));
 
         $response->assertOk();
+        $response->assertDontSee('Scan fingerprint');
         $response->assertHeader('Cache-Control', 'max-age=0, must-revalidate, no-cache, no-store, private');
         $response->assertHeader('Pragma', 'no-cache');
     }

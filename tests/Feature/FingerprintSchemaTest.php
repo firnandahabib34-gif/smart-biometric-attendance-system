@@ -27,22 +27,44 @@ class FingerprintSchemaTest extends TestCase
         $this->assertTrue(Schema::hasColumn('students', 'department'));
     }
 
-    public function test_student_form_contains_requested_departments_and_class_range(): void
+    public function test_student_form_contains_the_requested_academic_options(): void
     {
+        Student::create([
+            'student_number' => '2026008',
+            'name' => 'Mahasiswa Modal',
+            'department' => 'Teknik Informatika',
+            'program' => 'Informatika',
+            'class_name' => 'Pagi Web A',
+            'is_active' => true,
+        ]);
+
+        $this->assertSame([
+            'Pagi Web A',
+            'Pagi Mobile B',
+            'Pagi IoT C',
+            'Pagi AI D',
+            'Pagi Web E',
+        ], config('academic.class_options'));
+
         $this->actingAs(User::factory()->create())
-            ->get(route('students.create'))
+            ->get(route('fingerprint.index'))
             ->assertOk()
-            ->assertSee('D3 Teknik Elektronika Manufaktur')
-            ->assertSee('D4 Teknik Robotika')
-            ->assertSee('D3 Teknologi Geomatika')
-            ->assertSee('D4 Animasi')
-            ->assertSee('D3 Teknik Perencanaan dan Konstruksi Kapal')
-            ->assertSee('D4 Teknologi Rekayasa Konstruksi Perkapalan')
-            ->assertSee('D3 Akuntansi')
-            ->assertSee('D4 Logistik Perdagangan Internasional')
-            ->assertSee('Pagi 1-A')
-            ->assertSee('Pagi 8-E')
-            ->assertDontSee('Malam 3C');
+            ->assertSee('Teknik Informatika')
+            ->assertSee('Informatika')
+            ->assertSee('Pagi Web A')
+            ->assertSee('Pagi Mobile B')
+            ->assertSee('Pagi IoT C')
+            ->assertSee('Pagi AI D')
+            ->assertSee('Pagi Web E')
+            ->assertDontSee('Teknik Elektro')
+            ->assertDontSee('Pagi 1-A');
+
+        $this->get(route('students.index'))
+            ->assertOk()
+            ->assertDontSee('Tambah mahasiswa')
+            ->assertSee('data-edit-student', false)
+            ->assertSee('data-delete-student', false);
+        $this->get('/students/create')->assertStatus(405);
     }
 
     public function test_unverified_admin_can_save_a_student_and_return_to_the_list(): void
@@ -54,8 +76,8 @@ class FingerprintSchemaTest extends TestCase
                 'student_number' => '2026009',
                 'name' => 'Mahasiswa Uji',
                 'department' => 'Teknik Informatika',
-                'program' => 'D3 Teknik Informatika',
-                'class_name' => 'Pagi 1-A',
+                'program' => 'Informatika',
+                'class_name' => 'Pagi Web A',
                 'email' => 'mahasiswa.uji@example.test',
                 'phone' => '08123456789',
                 'is_active' => '1',
@@ -71,14 +93,14 @@ class FingerprintSchemaTest extends TestCase
     public function test_student_cannot_be_saved_when_required_details_are_missing(): void
     {
         $this->actingAs(User::factory()->create())
-            ->from(route('students.create'))
+            ->from(route('fingerprint.index'))
             ->post(route('students.store'), [
                 'student_number' => '2026099',
                 'name' => 'Data Belum Lengkap',
-                'program' => 'D3 Teknik Informatika',
+                'program' => 'Informatika',
                 'is_active' => '1',
             ])
-            ->assertRedirect(route('students.create'))
+            ->assertRedirect(route('fingerprint.index'))
             ->assertSessionHasErrors(['class_name', 'email', 'phone']);
 
         $this->assertDatabaseMissing('students', ['student_number' => '2026099']);
@@ -87,18 +109,18 @@ class FingerprintSchemaTest extends TestCase
     public function test_student_program_must_belong_to_the_selected_department(): void
     {
         $this->actingAs(User::factory()->create())
-            ->from(route('students.create'))
+            ->from(route('fingerprint.index'))
             ->post(route('students.store'), [
                 'student_number' => '2026199',
                 'name' => 'Jurusan Tidak Cocok',
-                'department' => 'Teknik Mesin',
+                'department' => 'Teknik Informatika',
                 'program' => 'D3 Teknik Informatika',
-                'class_name' => 'Pagi 1-A',
+                'class_name' => 'Pagi Web A',
                 'email' => 'jurusan.test@example.test',
                 'phone' => '08123456789',
                 'is_active' => '1',
             ])
-            ->assertRedirect(route('students.create'))
+            ->assertRedirect(route('fingerprint.index'))
             ->assertSessionHasErrors('program');
 
         $this->assertDatabaseMissing('students', ['student_number' => '2026199']);
@@ -110,26 +132,26 @@ class FingerprintSchemaTest extends TestCase
             'student_number' => '2026188',
             'name' => 'Mahasiswa Lama',
             'department' => 'Teknik Informatika',
-            'program' => 'Teknik Informatika',
-            'class_name' => 'Pagi 1-A',
+            'program' => 'D3 Teknik Informatika',
+            'class_name' => 'Pagi Web A',
             'email' => 'mahasiswa.lama@example.test',
             'phone' => '08123456780',
             'is_active' => true,
         ]);
 
         $this->actingAs(User::factory()->create())
-            ->from(route('students.edit', $student))
+            ->from(route('students.index'))
             ->put(route('students.update', $student), [
                 'student_number' => $student->student_number,
                 'name' => $student->name,
                 'department' => 'Teknik Informatika',
-                'program' => 'Teknik Informatika',
-                'class_name' => 'Pagi 1-A',
+                'program' => 'D3 Teknik Informatika',
+                'class_name' => 'Pagi Web A',
                 'email' => $student->email,
                 'phone' => $student->phone,
                 'is_active' => '1',
             ])
-            ->assertRedirect(route('students.edit', $student))
+            ->assertRedirect(route('students.index'))
             ->assertSessionHasErrors('program');
     }
 
@@ -139,8 +161,8 @@ class FingerprintSchemaTest extends TestCase
             'student_number' => '2026100',
             'name' => 'Nadia Putri',
             'department' => 'Teknik Informatika',
-            'program' => 'Teknik Informatika',
-            'class_name' => 'Pagi 1-A',
+            'program' => 'Informatika',
+            'class_name' => 'Pagi Web A',
             'is_active' => true,
         ]);
         Student::create([
@@ -148,7 +170,7 @@ class FingerprintSchemaTest extends TestCase
             'name' => 'Budi Santoso',
             'department' => 'Manajemen Bisnis',
             'program' => 'Akuntansi',
-            'class_name' => 'Pagi 2-B',
+            'class_name' => 'Pagi Mobile B',
             'is_active' => true,
         ]);
 
@@ -161,13 +183,16 @@ class FingerprintSchemaTest extends TestCase
             ->assertSee('Semua jurusan')
             ->assertSee('Semua program studi')
             ->assertSee('Semua kelas')
-            ->assertSee('Reset');
+            ->assertSee('Reset')
+            ->assertDontSee('Tambah mahasiswa')
+            ->assertSee('data-edit-student', false)
+            ->assertSee('data-delete-student', false);
 
         $response = $this->getJson(route('students.index', [
             'q' => 'Nadia',
             'department' => 'Teknik Informatika',
-            'program' => 'Teknik Informatika',
-            'class_name' => 'Pagi 1-A',
+            'program' => 'Informatika',
+            'class_name' => 'Pagi Web A',
         ]));
 
         $response->assertOk()->assertJsonPath('total', 1);
@@ -176,117 +201,67 @@ class FingerprintSchemaTest extends TestCase
 
         $this->getJson(route('students.index', [
             'department' => 'Teknik Informatika',
-            'program' => 'Teknik Informatika',
-            'class_name' => 'Pagi 2-B',
+            'program' => 'Informatika',
+            'class_name' => 'Pagi Mobile B',
         ]))
             ->assertOk()
             ->assertJsonPath('total', 0);
     }
 
-    public function test_admin_can_save_attendance_for_many_students_in_one_request(): void
-    {
-        $admin = User::factory()->create(['attendance_start' => '07:30']);
-        $students = collect(['2026010', '2026011'])->map(fn ($number) => Student::create([
-            'student_number' => $number,
-            'name' => 'Mahasiswa '.$number,
-            'program' => 'Teknik Informatika',
-            'is_active' => true,
-        ]));
-        $untickedStudent = Student::create([
-            'student_number' => '2026012',
-            'name' => 'Tidak Dipilih',
-            'program' => 'Teknik Informatika',
-            'is_active' => true,
-        ]);
-        Attendance::create([
-            'student_id' => $students[0]->id,
-            'attendance_date' => '2026-09-27',
-            'status' => 'absent',
-            'check_out' => '16:00',
-            'source' => 'generated',
-        ]);
-
-        $this->actingAs($admin)
-            ->get(route('attendance.index'))
-            ->assertOk()
-            ->assertSee('Absensi massal')
-            ->assertSee('Riwayat absensi per tanggal')
-            ->assertDontSee('Catat absensi')
-            ->assertDontSee('ID fingerprint')
-            ->assertSee('Jam keluar')
-            ->assertSee('Pilih semua');
-
-        $reportUrl = route('attendance.index', [
-            'month' => '2026-09',
-            'bulk_date' => '2026-09-27',
-            'bulk_check_in' => '07:45',
-            'bulk_check_out' => '16:45',
-        ]);
-
-        $this->actingAs($admin)
-            ->post(route('attendance.bulk'), [
-                'attendance_date' => '2026-09-27',
-                'check_in' => '07:45',
-                'check_out' => '16:45',
-                'student_ids' => $students->pluck('id')->all(),
-            ])
-            ->assertRedirect($reportUrl);
-
-        $this->actingAs($admin)
-            ->get($reportUrl)
-            ->assertOk()
-            ->assertSee('value="2026-09-27"', false)
-            ->assertSee('value="07:45"', false)
-            ->assertSee('value="16:45"', false);
-
-        $this->assertDatabaseHas('attendances', [
-            'student_id' => $students[0]->id,
-            'attendance_date' => '2026-09-27',
-            'status' => 'late',
-            'check_in' => '07:45',
-            'check_out' => '16:45',
-        ]);
-        $this->assertDatabaseHas('attendances', [
-            'student_id' => $students[1]->id,
-            'attendance_date' => '2026-09-27',
-            'status' => 'late',
-        ]);
-        $this->assertDatabaseMissing('attendances', [
-            'student_id' => $untickedStudent->id,
-            'attendance_date' => '2026-09-27',
-        ]);
-    }
-
-    public function test_bulk_attendance_keeps_existing_check_out_when_left_blank(): void
+    public function test_attendance_history_is_selected_by_year_month_and_day_then_grouped_by_class(): void
     {
         $admin = User::factory()->create();
-        $student = Student::create([
-            'student_number' => '2026120',
-            'name' => 'Mahasiswa Pulang',
-            'program' => 'D3 Teknik Informatika',
+        $webStudent = Student::create([
+            'student_number' => '2026010',
+            'name' => 'Mahasiswa Kelas Web',
+            'program' => 'Informatika',
+            'class_name' => 'Pagi Web A',
             'is_active' => true,
         ]);
+        $mobileStudent = Student::create([
+            'student_number' => '2026011',
+            'name' => 'Mahasiswa Kelas Mobile',
+            'program' => 'Informatika',
+            'class_name' => 'Pagi Mobile B',
+            'is_active' => true,
+        ]);
+        foreach ([$webStudent, $mobileStudent] as $student) {
+            Attendance::create([
+                'student_id' => $student->id,
+                'attendance_date' => '2026-09-27',
+                'status' => 'present',
+                'source' => 'fingerprint',
+            ]);
+        }
         Attendance::create([
-            'student_id' => $student->id,
-            'attendance_date' => '2026-09-27',
+            'student_id' => $webStudent->id,
+            'attendance_date' => '2026-09-26',
             'status' => 'present',
-            'check_out' => '16:00',
-            'source' => 'manual',
+            'source' => 'fingerprint',
         ]);
 
         $this->actingAs($admin)
-            ->post(route('attendance.bulk'), [
-                'attendance_date' => '2026-09-27',
-                'check_in' => '07:20',
-                'student_ids' => [$student->id],
-            ])
-            ->assertRedirect();
+            ->get(route('attendance.index', [
+                'year' => 2026,
+                'month_number' => 9,
+                'day' => 27,
+            ]))
+            ->assertOk()
+            ->assertSee('Tahun')
+            ->assertSee('Bulan')
+            ->assertSee('Hari / tanggal')
+            ->assertSee('Riwayat absensi per kelas')
+            ->assertSee('Mahasiswa Kelas Web')
+            ->assertSee('Mahasiswa Kelas Mobile')
+            ->assertSee('27 September 2026')
+            ->assertDontSee('26 September 2026')
+            ->assertDontSee('Absensi massal');
 
-        $this->assertDatabaseHas('attendances', [
-            'student_id' => $student->id,
-            'attendance_date' => '2026-09-27',
-            'check_out' => '16:00',
-        ]);
+        $this->get(route('attendance.index', [
+            'year' => 2026,
+            'month_number' => 9,
+            'day' => 31,
+        ]))->assertSessionHasErrors('day');
     }
 
     public function test_fingerprint_scan_records_check_in_then_check_out_and_logs_both(): void
@@ -296,8 +271,8 @@ class FingerprintSchemaTest extends TestCase
             'student_number' => '2026130',
             'name' => 'Mahasiswa Fingerprint',
             'department' => 'Teknik Informatika',
-            'program' => 'D3 Teknik Informatika',
-            'class_name' => 'Pagi 1-A',
+            'program' => 'Informatika',
+            'class_name' => 'Pagi Web A',
             'email' => 'fingerprint@example.test',
             'phone' => '08123456781',
             'fingerprint_id' => 'FP-AUTO-01',
@@ -308,13 +283,22 @@ class FingerprintSchemaTest extends TestCase
         $this->actingAs($admin)
             ->get(route('fingerprint.index'))
             ->assertOk()
-            ->assertSee('ID fingerprint')
-            ->assertSee('Log fingerprint terbaru');
+            ->assertSee('Tambah mahasiswa')
+            ->assertSee('/api/device/fingerprint/scan')
+            ->assertSee('Riwayat perangkat')
+            ->assertDontSee('Catat scan')
+            ->assertDontSee('Masukkan ID fingerprint');
 
+        config(['services.fingerprint.device_token' => 'test-device-token']);
         $this->travelTo($checkInTime);
-        $this->actingAs($admin)
-            ->post(route('fingerprint.scan'), ['fingerprint_id' => 'FP-AUTO-01'])
-            ->assertRedirect(route('fingerprint.index'));
+        $this->withToken('test-device-token')
+            ->postJson(route('device.fingerprint.scan'), [
+                'fingerprint_id' => 'FP-AUTO-01',
+                'type' => 'check_in',
+                'device_id' => 'ESP32-WEB-A',
+            ])
+            ->assertOk()
+            ->assertJsonPath('message', 'Check-in berhasil');
 
         $this->assertDatabaseHas('attendances', [
             'student_id' => $student->id,
@@ -325,9 +309,14 @@ class FingerprintSchemaTest extends TestCase
         ]);
 
         $this->travelTo($checkInTime->addHours(8));
-        $this->actingAs($admin)
-            ->post(route('fingerprint.scan'), ['fingerprint_id' => 'FP-AUTO-01'])
-            ->assertRedirect(route('fingerprint.index'));
+        $this->withToken('test-device-token')
+            ->postJson(route('device.fingerprint.scan'), [
+                'fingerprint_id' => 'FP-AUTO-01',
+                'type' => 'check_out',
+                'device_id' => 'ESP32-WEB-A',
+            ])
+            ->assertOk()
+            ->assertJsonPath('message', 'Check-out berhasil');
 
         $this->assertDatabaseHas('attendances', [
             'student_id' => $student->id,
@@ -344,6 +333,11 @@ class FingerprintSchemaTest extends TestCase
             'event_type' => 'attendance_check_out',
             'result' => 'success',
         ]);
+        $this->assertDatabaseHas('fingerprint_logs', [
+            'student_id' => $student->id,
+            'device_id' => 'ESP32-WEB-A',
+            'event_type' => 'attendance_check_in',
+        ]);
 
         $this->travelBack();
     }
@@ -355,8 +349,8 @@ class FingerprintSchemaTest extends TestCase
             'student_number' => '2026131',
             'name' => 'Mahasiswa Riwayat',
             'department' => 'Teknik Informatika',
-            'program' => 'D3 Teknik Informatika',
-            'class_name' => 'Pagi 1-A',
+            'program' => 'Informatika',
+            'class_name' => 'Pagi Web A',
             'email' => 'riwayat@example.test',
             'phone' => '08123456782',
             'is_active' => true,
@@ -374,30 +368,117 @@ class FingerprintSchemaTest extends TestCase
         $this->actingAs($admin)
             ->get(route('attendance.index', ['month' => '2026-09']))
             ->assertOk()
-            ->assertSee('Riwayat absensi per tanggal')
-            ->assertSee('26 September 2026')
+            ->assertSee('Riwayat absensi per hari')
             ->assertSee('27 September 2026');
     }
 
-    public function test_fingerprint_registration_is_recorded_in_fingerprint_logs(): void
+    public function test_device_enrollment_is_logged_and_bound_to_student(): void
     {
-        $admin = User::factory()->create();
         $student = Student::create([
             'student_number' => '2026001',
             'name' => 'Nadia Putri',
-            'program' => 'Teknik Informatika',
+            'department' => 'Teknik Informatika',
+            'program' => 'Informatika',
+            'class_name' => 'Pagi Web A',
             'is_active' => true,
         ]);
 
-        $this->actingAs($admin)
-            ->patch(route('students.fingerprint', $student), ['fingerprint_id' => 'FP-001'])
-            ->assertRedirect();
+        config(['services.fingerprint.device_token' => 'test-device-token']);
+        $this->withToken('test-device-token')
+            ->postJson(route('device.fingerprint.enroll'), [
+                'student_number' => $student->student_number,
+                'fingerprint_id' => 'FP-001',
+                'device_id' => 'ESP32-WEB-A',
+            ])
+            ->assertOk()
+            ->assertJsonPath('message', 'Fingerprint berhasil didaftarkan');
+
+        $this->assertDatabaseHas('students', [
+            'id' => $student->id,
+            'fingerprint_id' => 'FP-001',
+        ]);
 
         $this->assertDatabaseHas('fingerprint_logs', [
             'student_id' => $student->id,
             'fingerprint_id' => 'FP-001',
             'event_type' => 'registered',
             'result' => 'success',
+            'device_id' => 'ESP32-WEB-A',
+        ]);
+    }
+
+    public function test_device_api_requires_a_configured_valid_token(): void
+    {
+        config(['services.fingerprint.device_token' => null]);
+        $this->postJson(route('device.fingerprint.scan'), [
+            'fingerprint_id' => 'FP-001',
+            'type' => 'check_in',
+        ])->assertServiceUnavailable();
+
+        config(['services.fingerprint.device_token' => 'test-device-token']);
+        $this->postJson(route('device.fingerprint.scan'), [
+            'fingerprint_id' => 'FP-001',
+            'type' => 'check_in',
+        ])->assertUnauthorized();
+    }
+
+    public function test_student_crud_actions_are_modal_and_add_is_only_on_fingerprint_page(): void
+    {
+        $admin = User::factory()->create();
+        $student = Student::create([
+            'student_number' => '2026200',
+            'name' => 'Mahasiswa Modal',
+            'department' => 'Teknik Informatika',
+            'program' => 'Informatika',
+            'class_name' => 'Pagi Web A',
+            'email' => 'modal@example.test',
+            'phone' => '08123456780',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($admin)
+            ->get(route('students.index'))
+            ->assertOk()
+            ->assertDontSee('Tambah mahasiswa')
+            ->assertSee('data-edit-student', false)
+            ->assertSee('data-delete-student', false)
+            ->assertSee('id="student-edit-modal"', false)
+            ->assertSee('id="student-delete-modal"', false);
+
+        $this->get(route('fingerprint.index'))
+            ->assertOk()
+            ->assertSee('data-open-student-modal', false)
+            ->assertSee('id="student-create-modal"', false)
+            ->assertSee('name="origin" value="fingerprint"', false);
+
+        $this->post(route('students.store'), [
+            'origin' => 'fingerprint',
+            'student_number' => '2026201',
+            'name' => 'Mahasiswa Baru dari Fingerprint',
+            'department' => 'Teknik Informatika',
+            'program' => 'Informatika',
+            'class_name' => 'Pagi IoT C',
+            'email' => 'baru@example.test',
+            'phone' => '08123456789',
+            'is_active' => '1',
+        ])->assertRedirect(route('fingerprint.index'));
+
+        $this->put(route('students.update', $student), [
+            'student_id' => (string) $student->id,
+            'student_number' => $student->student_number,
+            'name' => 'Nama Diperbarui',
+            'department' => 'Teknik Informatika',
+            'program' => 'Informatika',
+            'class_name' => 'Pagi Mobile B',
+            'email' => $student->email,
+            'phone' => $student->phone,
+            'is_active' => '1',
+        ])->assertRedirect(route('students.index'));
+
+        $this->assertDatabaseHas('students', [
+            'id' => $student->id,
+            'name' => 'Nama Diperbarui',
+            'class_name' => 'Pagi Mobile B',
         ]);
     }
 

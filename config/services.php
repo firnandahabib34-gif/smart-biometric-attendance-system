@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'fingerprint' => [
+        'device_token' => env('FINGERPRINT_DEVICE_TOKEN'),
+    ],
+
 ];

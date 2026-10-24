@@ -5,7 +5,6 @@
 @section('content')
     <div class="page-heading">
         <div><h1>Ringkasan</h1><p>{{ now()->translatedFormat('l, d F Y') }}</p></div>
-        <a class="button button-primary" href="{{ route('fingerprint.index') }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path stroke-linecap="round" d="M7 8.5a5 5 0 0 1 10 0c0 4.6-.8 8.1-2.4 11M4.6 10.5c0 3.4-.4 6-1.2 7.8M19.4 10.5c0 1.8-.1 3.4-.4 4.8M8.5 11c-.1 3.4-.5 5.7-1.4 7.5m5-6.5c0 2.6-.4 4.8-1.3 6.6"/></svg>Scan fingerprint</a>
     </div>
 
     <section class="stat-grid" aria-label="Statistik hari ini">

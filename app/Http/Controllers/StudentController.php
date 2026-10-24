@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\FingerprintLog;
 use App\Models\Student;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -72,21 +71,13 @@ class StudentController extends Controller
         return view('students.index', compact('students', 'departments', 'programs', 'programsByDepartment', 'classes'));
     }
 
-    public function create(): View
-    {
-        return view('students.form', $this->formData(new Student));
-    }
-
     public function store(Request $request): RedirectResponse
     {
         Student::create($this->validatedData($request));
 
-        return redirect()->route('students.index')->with('success', 'Data mahasiswa berhasil ditambahkan.');
-    }
+        $destination = $request->input('origin') === 'fingerprint' ? 'fingerprint.index' : 'students.index';
 
-    public function edit(Student $student): View
-    {
-        return view('students.form', $this->formData($student));
+        return redirect()->route($destination)->with('success', 'Data mahasiswa berhasil ditambahkan.');
     }
 
     public function update(Request $request, Student $student): RedirectResponse
@@ -109,30 +100,6 @@ class StudentController extends Controller
         return redirect()->route('students.index')->with('success', 'Data mahasiswa berhasil dihapus.');
     }
 
-    public function registerFingerprint(Request $request, Student $student): RedirectResponse
-    {
-        $validated = $request->validate([
-            'fingerprint_id' => ['required', 'string', 'max:100', Rule::unique('students')->ignore($student->id)],
-        ]);
-
-        $eventType = $student->fingerprint_id ? 'updated' : 'registered';
-
-        $student->update([
-            'fingerprint_id' => $validated['fingerprint_id'],
-            'fingerprint_registered_at' => now(),
-        ]);
-
-        FingerprintLog::create([
-            'student_id' => $student->id,
-            'fingerprint_id' => $validated['fingerprint_id'],
-            'event_type' => $eventType,
-            'result' => 'success',
-            'message' => 'ID template fingerprint disimpan oleh admin.',
-        ]);
-
-        return back()->with('success', 'ID template fingerprint berhasil disimpan.');
-    }
-
     private function validatedData(Request $request, ?Student $student = null): array
     {
         $classOptions = $this->classOptions();
@@ -150,39 +117,8 @@ class StudentController extends Controller
         ]);
     }
 
-    private function formData(Student $student): array
-    {
-        $programsByDepartment = config('academic.departments');
-        $selectedDepartment = $this->departmentFor($student);
-
-        return [
-            'student' => $student,
-            'programsByDepartment' => $programsByDepartment,
-            'selectedDepartment' => old('department', $selectedDepartment),
-            'classOptions' => $this->classOptions(),
-        ];
-    }
-
     private function classOptions(): array
     {
-        return collect(config('academic.class_levels'))
-            ->flatMap(fn (int $level) => collect(config('academic.class_groups'))
-                ->map(fn (string $group) => 'Pagi '.$level.'-'.$group))
-            ->all();
-    }
-
-    private function departmentFor(Student $student): ?string
-    {
-        if ($student->department) {
-            return $student->department;
-        }
-
-        foreach (config('academic.departments') as $department => $programs) {
-            if (in_array($student->program, $programs, true)) {
-                return $department;
-            }
-        }
-
-        return config('academic.legacy_department_by_program.'.$student->program);
+        return config('academic.class_options');
     }
 }
